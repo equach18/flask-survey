@@ -1,14 +1,13 @@
-from flask import Flask, request, render_template, redirect, flash
+from flask import Flask, request, render_template, redirect, flash, session
 from flask_debugtoolbar import DebugToolbarExtension
 from surveys import satisfaction_survey
 
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = 'secret'
-debug = DebugToolbarExtension(app)
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
+debug = DebugToolbarExtension(app)
 
-responses = []
 
 @app.route('/')
 def show_start():
@@ -17,18 +16,19 @@ def show_start():
     instructions = satisfaction_survey.instructions
     return render_template("start_survey.html", title=title, instructions=instructions)
 
-@app.route('/new-survey')
+@app.route('/new-survey', methods = ["POST"])
 def empty_responses():
     """creates a new survey by emptying responses"""
-    responses.clear()
+    session['responses'] = []
     return redirect('/questions/0')
 
 @app.route('/questions/<int:id>')
 def show_question(id):
     """shows the current question and answer options"""
+    responses = session.get('responses')
     if id != len(responses):
         flash("Invalid question id.")
-        return redirect(f"/questions/{len(responses)}")
+        return redirect(f"/questions/{responses}")
     if id == len(satisfaction_survey.questions) == len(responses):
         flash("Survey has been completed")
         return redirect('/complete')
@@ -39,8 +39,10 @@ def show_question(id):
 @app.route('/answer', methods = ["POST"])
 def add_response():
     """appends the answer to the responses list"""
-    response = request.form["option"]
-    responses.append(response)
+    option = request.form["option"]
+    responses = session['responses']
+    responses.append(option)
+    session['responses'] = responses
     
     if len(responses) < len(satisfaction_survey.questions):
         return redirect(f"/questions/{len(responses)}")
